@@ -6,6 +6,13 @@ cmake_minimum_required(VERSION 2.8.6)
 
 project(brotli C)
 
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  message(STATUS "Setting build type to Release as none was specified.")
+  set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build." FORCE)
+else()
+  message(STATUS "Build type is '${CMAKE_BUILD_TYPE}'")
+endif()
+
 include(CheckCSourceCompiles)
 check_c_source_compiles(
   "#if defined(__EMSCRIPTEN__)
@@ -110,13 +117,16 @@ if(NOT LOG2_RES)
   CHECK_FUNCTION_EXISTS(log2 LOG2_LIBM_RES)
   if(LOG2_LIBM_RES)
     set(LIBM_LIBRARY "m")
+    add_definitions(-DBROTLI_HAVE_LOG2=1)
   else()
-    message(FATAL_ERROR "log2() not found")
+    add_definitions(-DBROTLI_HAVE_LOG2=0)
   endif()
 
   set(CMAKE_REQUIRED_LIBRARIES "${orig_req_libs}")
   unset(LOG2_LIBM_RES)
   unset(orig_req_libs)
+else()
+  add_definitions(-DBROTLI_HAVE_LOG2=1)
 endif()
 unset(LOG2_RES)
 
@@ -293,17 +303,21 @@ if(NOT BROTLI_DISABLE_TESTS)
     set(OUTPUT_FILE "${CMAKE_CURRENT_BINARY_DIR}/${OUTPUT_NAME}")
     set(INPUT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/${INPUT}")
 
-    foreach(quality 1 6 9 11)
-      add_test(NAME "${BROTLI_TEST_PREFIX}roundtrip/${INPUT}/${quality}"
-        COMMAND "${CMAKE_COMMAND}"
-          -DBROTLI_WRAPPER=${BROTLI_WRAPPER}
-          -DBROTLI_WRAPPER_LD_PREFIX=${BROTLI_WRAPPER_LD_PREFIX}
-          -DBROTLI_CLI=$<TARGET_FILE:brotli>
-          -DQUALITY=${quality}
-          -DINPUT=${INPUT_FILE}
-          -DOUTPUT=${OUTPUT_FILE}.${quality}
-          -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-roundtrip-test.cmake)
-    endforeach()
+    if (EXISTS "${INPUT_FILE}")
+      foreach(quality 1 6 9 11)
+        add_test(NAME "${BROTLI_TEST_PREFIX}roundtrip/${INPUT}/${quality}"
+          COMMAND "${CMAKE_COMMAND}"
+            -DBROTLI_WRAPPER=${BROTLI_WRAPPER}
+            -DBROTLI_WRAPPER_LD_PREFIX=${BROTLI_WRAPPER_LD_PREFIX}
+            -DBROTLI_CLI=$<TARGET_FILE:brotli>
+            -DQUALITY=${quality}
+            -DINPUT=${INPUT_FILE}
+            -DOUTPUT=${OUTPUT_FILE}.${quality}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/run-roundtrip-test.cmake)
+      endforeach()
+    else()
+      message(WARNING "Test file ${INPUT} does not exist.")
+    endif()
   endforeach()
 
   file(GLOB_RECURSE

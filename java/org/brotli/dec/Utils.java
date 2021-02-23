@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.Buffer;
+import java.nio.ByteBuffer;
 
 /**
  * A set of utility methods.
@@ -58,6 +59,10 @@ final class Utils {
     }
   }
 
+  static void copyBytes(byte[] dst, int target, byte[] src, int start, int end) {
+    System.arraycopy(src, start, dst, target, end - start);
+  }
+
   static void copyBytesWithin(byte[] bytes, int target, int start, int end) {
     System.arraycopy(bytes, start, bytes, target, end - start);
   }
@@ -82,6 +87,18 @@ final class Utils {
     } catch (UnsupportedEncodingException e) {
       throw new RuntimeException(e); // cannot happen
     }
+  }
+
+  static ByteBuffer asReadOnlyBuffer(ByteBuffer src) {
+    return src.asReadOnlyBuffer();
+  }
+
+  static int isReadOnly(ByteBuffer src) {
+    return src.isReadOnly() ? 1 : 0;
+  }
+
+  static int isDirect(ByteBuffer src) {
+    return src.isDirect() ? 1 : 0;
   }
 
   // Crazy pills factory: code compiled for JDK8 does not work on JRE9.

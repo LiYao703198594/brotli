@@ -6,7 +6,7 @@ case "$1" in
     "install")
 	case "${TRAVIS_OS_NAME}" in
 	    "osx")
-		brew update
+		brew update >/dev/null
 		brew install binutils
 
 		case "${CC}" in
@@ -17,8 +17,8 @@ case "$1" in
 
 		case "${BUILD_SYSTEM}" in
 		    "bazel")
+			brew cask install homebrew/cask-versions/adoptopenjdk8
 			brew install bazel
-			brew upgrade python
 			;;
 		esac
 		;;
@@ -62,7 +62,8 @@ case "$1" in
 		bazel build -c opt ...:all &&
 		cd go && bazel test -c opt ...:all && cd .. &&
 		cd java && bazel test -c opt ...:all && cd .. &&
-		cd js && bazel test -c opt ...:all && cd .. &&
+		echo "bazelbuild/rules_closure seems to be dead; js build is skipped" &&
+		echo "cd js && bazel test -c opt ...:all && cd .." &&
 		cd research && bazel build -c opt ...:all && cd ..
 		;;
 	esac

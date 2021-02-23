@@ -6,6 +6,11 @@
 
 /* Command line interface for Brotli library. */
 
+/* Mute strerror/strcpy warnings. */
+#if !defined(_CRT_SECURE_NO_WARNINGS)
+#define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -127,6 +132,8 @@ typedef struct {
      until 4GiB+ files are compressed / decompressed on 32-bit CPUs. */
   size_t total_in;
   size_t total_out;
+  clock_t start_time;
+  clock_t end_time;
 } Context;
 
 /* Parse up to 5 decimal digits. */
@@ -801,8 +808,13 @@ static void InitializeBuffers(Context* context) {
   context->next_out = context->output;
   context->total_in = 0;
   context->total_out = 0;
+  if (context->verbosity > 0) {
+    context->start_time = clock();
+  }
 }
 
+/* This method might give the false-negative result.
+   However, after an empty / incomplete read it should tell the truth. */
 static BROTLI_BOOL HasMoreInput(Context* context) {
   return feof(context->fin) ? BROTLI_FALSE : BROTLI_TRUE;
 }
@@ -866,6 +878,7 @@ static void PrintFileProcessingProgress(Context* context) {
   PrintBytes(context->total_in);
   fprintf(stderr, " -> ");
   PrintBytes(context->total_out);
+  fprintf(stderr, " in %1.2f sec", (double)(context->end_time - context->start_time) / CLOCKS_PER_SEC);
 }
 
 static BROTLI_BOOL DecompressFile(Context* context, BrotliDecoderState* s) {
@@ -883,12 +896,15 @@ static BROTLI_BOOL DecompressFile(Context* context, BrotliDecoderState* s) {
       if (!ProvideOutput(context)) return BROTLI_FALSE;
     } else if (result == BROTLI_DECODER_RESULT_SUCCESS) {
       if (!FlushOutput(context)) return BROTLI_FALSE;
-      if (context->available_in != 0 || HasMoreInput(context)) {
+      int has_more_input =
+          (context->available_in != 0) || (fgetc(context->fin) != EOF);
+      if (has_more_input) {
         fprintf(stderr, "corrupt input [%s]\n",
                 PrintablePath(context->current_input_path));
         return BROTLI_FALSE;
       }
       if (context->verbosity > 0) {
+        context->end_time = clock();
         fprintf(stderr, "Decompressed ");
         PrintFileProcessingProgress(context);
         fprintf(stderr, "\n");
@@ -957,6 +973,7 @@ static BROTLI_BOOL CompressFile(Context* context, BrotliEncoderState* s) {
     if (BrotliEncoderIsFinished(s)) {
       if (!FlushOutput(context)) return BROTLI_FALSE;
       if (context->verbosity > 0) {
+        context->end_time = clock();
         fprintf(stderr, "Compressed ");
         PrintFileProcessingProgress(context);
         fprintf(stderr, "\n");
